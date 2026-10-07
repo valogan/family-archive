@@ -17,6 +17,17 @@ export interface LivedAt {
   moveOut?: string;
 }
 
+export interface MediaTag {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface MediaWithTags extends Media {
+  people: { person: Person; tag: MediaTag | null }[];
+}
+
 export interface Media {
   id: string;
   filename: string;

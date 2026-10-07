@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import type { Media, Person } from "@/lib/types";
+import { useEffect, useRef, useState } from "react";
+import type { Media, MediaTag, MediaWithTags, Person } from "@/lib/types";
 
 export default function MediaPage() {
   const [media, setMedia] = useState<Media[]>([]);
@@ -12,6 +12,12 @@ export default function MediaPage() {
   const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [search, setSearch] = useState("");
+
+  const [selected, setSelected] = useState<MediaWithTags | null>(null);
+  const [tagPersonId, setTagPersonId] = useState("");
+  const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
+  const [drawRect, setDrawRect] = useState<MediaTag | null>(null);
+  const imgWrapRef = useRef<HTMLDivElement>(null);
 
   const fetchMedia = async (q = "") => {
     const url = q ? `/api/media?search=${encodeURIComponent(q)}` : "/api/media";
@@ -48,6 +54,85 @@ export default function MediaPage() {
   const getSrc = (m: Media) => {
     const filename = m.path.split("/").pop();
     return `/api/uploads/${filename}`;
+  };
+
+  const openMedia = async (m: Media) => {
+    const res = await fetch(`/api/media/${m.id}`);
+    if (!res.ok) return;
+    setSelected(await res.json());
+    setTagPersonId("");
+    setDrawStart(null);
+    setDrawRect(null);
+  };
+
+  const closeMedia = () => {
+    setSelected(null);
+    setTagPersonId("");
+    setDrawStart(null);
+    setDrawRect(null);
+  };
+
+  const refreshSelected = async (id: string) => {
+    const res = await fetch(`/api/media/${id}`);
+    if (res.ok) setSelected(await res.json());
+  };
+
+  const relPos = (e: React.MouseEvent) => {
+    const rect = imgWrapRef.current!.getBoundingClientRect();
+    return {
+      x: Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)),
+      y: Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height)),
+    };
+  };
+
+  const handleImgMouseDown = (e: React.MouseEvent) => {
+    if (!tagPersonId || selected?.mimeType.startsWith("video")) return;
+    const p = relPos(e);
+    setDrawStart(p);
+    setDrawRect({ x: p.x, y: p.y, w: 0, h: 0 });
+  };
+
+  const handleImgMouseMove = (e: React.MouseEvent) => {
+    if (!drawStart) return;
+    const p = relPos(e);
+    setDrawRect({
+      x: Math.min(drawStart.x, p.x),
+      y: Math.min(drawStart.y, p.y),
+      w: Math.abs(p.x - drawStart.x),
+      h: Math.abs(p.y - drawStart.y),
+    });
+  };
+
+  const handleImgMouseUp = async () => {
+    if (!drawStart || !selected || !tagPersonId) return;
+    setDrawStart(null);
+    if (!drawRect || drawRect.w < 0.01 || drawRect.h < 0.01) {
+      setDrawRect(null);
+      return;
+    }
+    await fetch(`/api/media/${selected.id}/tags`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ personId: tagPersonId, ...drawRect }),
+    });
+    setDrawRect(null);
+    setTagPersonId("");
+    refreshSelected(selected.id);
+  };
+
+  const cancelDrag = () => {
+    setDrawStart(null);
+    setDrawRect(null);
+  };
+
+  const untagPerson = async (personId: string) => {
+    if (!selected) return;
+    await fetch(`/api/media/${selected.id}/tags`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ personId }),
+    });
+    refreshSelected(selected.id);
   };
 
   return (
@@ -209,7 +294,11 @@ export default function MediaPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {media.map((m) => (
-            <div key={m.id} className="group bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-all">
+            <div
+              key={m.id}
+              onClick={() => openMedia(m)}
+              className="group bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-all cursor-pointer"
+            >
               <div className="aspect-square bg-gray-100 overflow-hidden">
                 {m.mimeType.startsWith("video") ? (
                   <video src={getSrc(m)} controls className="w-full h-full object-cover" />
@@ -251,6 +340,133 @@ export default function MediaPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {selected && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
+          onClick={closeMedia}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="font-semibold text-gray-900 truncate">{selected.originalName}</h2>
+              <button
+                onClick={closeMedia}
+                className="text-gray-400 hover:text-gray-700 text-xl leading-none px-2"
+              >
+                &times;
+              </button>
+            </div>
+
+            {selected.mimeType.startsWith("video") ? (
+              <video src={getSrc(selected)} controls className="w-full rounded-xl" />
+            ) : (
+              <div
+                ref={imgWrapRef}
+                onMouseDown={handleImgMouseDown}
+                onMouseMove={handleImgMouseMove}
+                onMouseUp={handleImgMouseUp}
+                onMouseLeave={cancelDrag}
+                className={`relative select-none ${tagPersonId ? "cursor-crosshair" : ""}`}
+              >
+                <img
+                  src={getSrc(selected)}
+                  alt={selected.originalName}
+                  draggable={false}
+                  className="w-full block rounded-xl"
+                />
+                {selected.people
+                  .filter(({ tag }) => tag !== null)
+                  .map(({ person, tag }) => (
+                    <div
+                      key={person.id}
+                      className="absolute border-2 border-white/90 shadow-[0_0_0_1px_rgba(17,24,39,0.4)] rounded-sm group/tag"
+                      style={{
+                        left: `${tag!.x * 100}%`,
+                        top: `${tag!.y * 100}%`,
+                        width: `${tag!.w * 100}%`,
+                        height: `${tag!.h * 100}%`,
+                      }}
+                    >
+                      <span className="absolute left-0 top-0 -translate-y-full bg-gray-900/85 text-white text-xs font-medium px-2 py-0.5 rounded-md whitespace-nowrap">
+                        {person.name}
+                      </span>
+                      <button
+                        onClick={() => untagPerson(person.id)}
+                        title="Remove position"
+                        className="absolute -right-2.5 -top-2.5 bg-red-500 text-white rounded-full w-5 h-5 text-xs leading-none opacity-0 group-hover/tag:opacity-100 transition-opacity"
+                      >
+                        &times;
+                      </button>
+                    </div>
+                  ))}
+                {drawRect && drawStart && (
+                  <div
+                    className="absolute border-2 border-primary-500 bg-primary-500/20 rounded-sm"
+                    style={{
+                      left: `${drawRect.x * 100}%`,
+                      top: `${drawRect.y * 100}%`,
+                      width: `${drawRect.w * 100}%`,
+                      height: `${drawRect.h * 100}%`,
+                    }}
+                  />
+                )}
+              </div>
+            )}
+
+            <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-3">
+              <select
+                value={tagPersonId}
+                onChange={(e) => setTagPersonId(e.target.value)}
+                className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+              >
+                <option value="">Tag someone...</option>
+                {people.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400">
+                {selected.mimeType.startsWith("video")
+                  ? "Position tagging is for photos only."
+                  : tagPersonId
+                    ? "Now drag a rectangle over that person in the photo."
+                    : "Pick a person, then drag a rectangle over them in the photo."}
+              </p>
+            </div>
+
+            {selected.people.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-gray-50">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">In this media</p>
+                <div className="flex flex-wrap gap-2">
+                  {selected.people.map(({ person, tag }) => (
+                    <span
+                      key={person.id}
+                      className={`text-sm px-3 py-1.5 rounded-full border ${
+                        tag
+                          ? "bg-primary-50 border-primary-300 text-primary-700"
+                          : "bg-gray-50 border-gray-200 text-gray-500"
+                      }`}
+                    >
+                      {person.name}
+                      {tag && (
+                        <button
+                          onClick={() => untagPerson(person.id)}
+                          className="ml-1.5 text-gray-400 hover:text-red-500"
+                          title="Remove position"
+                        >
+                          &times;
+                        </button>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getMedia } from "@/lib/queries";
+import { getMediaWithTags } from "@/lib/queries";
 
 export async function GET(
   _req: NextRequest,
@@ -7,7 +7,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const media = await getMedia(id);
+    const media = await getMediaWithTags(id);
     if (!media) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json(media);
   } catch (err: any) {

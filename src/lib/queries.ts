@@ -1,5 +1,5 @@
 import { getDriver } from "./db";
-import { Person, Media, Relationship, PersonWithRelations, SearchResult, LivedAt } from "./types";
+import { Person, Media, Relationship, PersonWithRelations, SearchResult, LivedAt, MediaWithTags, MediaTag } from "./types";
 import { v4 as uuid } from "uuid";
 
 export async function createPerson(
@@ -361,6 +361,92 @@ export async function getMedia(id: string): Promise<Media | null> {
     if (result.records.length === 0) return null;
     const record = result.records[0];
     return record.get("m").properties as Media;
+  } finally {
+    await session.close();
+  }
+}
+
+export async function getMediaWithTags(
+  id: string
+): Promise<MediaWithTags | null> {
+  const driver = getDriver();
+  const session = driver.session();
+
+  try {
+    const result = await session.run(
+      `
+      MATCH (m:Media {id: $id})
+      OPTIONAL MATCH (p:Person)-[r:APPEARS_IN]->(m)
+      RETURN m,
+        collect({
+          person: p,
+          tagX: r.tagX, tagY: r.tagY, tagW: r.tagW, tagH: r.tagH
+        }) as people
+    `,
+      { id }
+    );
+    if (result.records.length === 0) return null;
+
+    const record = result.records[0];
+    const media = record.get("m").properties as Media;
+    const people = record
+      .get("people")
+      .filter((e: any) => e.person !== null)
+      .map((e: any) => ({
+        person: e.person.properties as Person,
+        tag:
+          e.tagX === null || e.tagX === undefined
+            ? null
+            : ({ x: e.tagX, y: e.tagY, w: e.tagW, h: e.tagH } as MediaTag),
+      }));
+
+    return { ...media, people };
+  } finally {
+    await session.close();
+  }
+}
+
+export async function tagPersonInMedia(
+  personId: string,
+  mediaId: string,
+  box: MediaTag
+): Promise<boolean> {
+  const driver = getDriver();
+  const session = driver.session();
+
+  try {
+    const result = await session.run(
+      `
+      MATCH (p:Person {id: $personId}), (m:Media {id: $mediaId})
+      MERGE (p)-[r:APPEARS_IN]->(m)
+      SET r.tagX = $x, r.tagY = $y, r.tagW = $w, r.tagH = $h
+      RETURN p.id as id
+    `,
+      { personId, mediaId, ...box }
+    );
+    return result.records.length > 0;
+  } finally {
+    await session.close();
+  }
+}
+
+export async function untagPersonInMedia(
+  personId: string,
+  mediaId: string
+): Promise<boolean> {
+  const driver = getDriver();
+  const session = driver.session();
+
+  try {
+    const result = await session.run(
+      `
+      MATCH (p:Person {id: $personId})-[r:APPEARS_IN]->(m:Media {id: $mediaId})
+      SET r.tagX = null, r.tagY = null, r.tagW = null, r.tagH = null
+      RETURN p.id as id
+    `,
+      { personId, mediaId }
+    );
+    return result.records.length > 0;
   } finally {
     await session.close();
   }
