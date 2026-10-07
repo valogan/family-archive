@@ -18,7 +18,11 @@ export default function PersonDetailPage() {
   const [relTarget, setRelTarget] = useState("");
   const [relType, setRelType] = useState(RELATIONSHIP_TYPES[0]);
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ name: "", birthDate: "", deathDate: "", bio: "" });
+  const [editForm, setEditForm] = useState({ name: "", birthDate: "", deathDate: "", isLiving: true, facts: "", bio: "" });
+  const [showLocForm, setShowLocForm] = useState(false);
+  const [locName, setLocName] = useState("");
+  const [locDate, setLocDate] = useState("");
+  const [newFact, setNewFact] = useState("");
 
   const fetchPerson = async () => {
     const res = await fetch(`/api/people/${params.id}`);
@@ -29,6 +33,8 @@ export default function PersonDetailPage() {
       name: data.name,
       birthDate: data.birthDate || "",
       deathDate: data.deathDate || "",
+      isLiving: data.isLiving !== false,
+      facts: (data.facts || []).join("\n"),
       bio: data.bio || "",
     });
   };
@@ -59,11 +65,37 @@ export default function PersonDetailPage() {
     fetchPerson();
   };
 
+  const addLocation = async () => {
+    if (!locName || !locDate) return;
+    await fetch(`/api/people/${params.id}/locations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ location: locName, date: locDate }),
+    });
+    setShowLocForm(false);
+    setLocName("");
+    setLocDate("");
+    fetchPerson();
+  };
+
+  const removeLocation = async (location: string, date: string) => {
+    await fetch(`/api/people/${params.id}/locations`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ location, date }),
+    });
+    fetchPerson();
+  };
+
   const saveEdit = async () => {
-    const body: any = { name: editForm.name };
-    if (editForm.birthDate) body.birthDate = editForm.birthDate;
-    if (editForm.deathDate) body.deathDate = editForm.deathDate;
-    if (editForm.bio) body.bio = editForm.bio;
+    const body: any = {
+      name: editForm.name,
+      birthDate: editForm.birthDate || null,
+      deathDate: editForm.deathDate || null,
+      isLiving: editForm.isLiving,
+      facts: editForm.facts.split("\n").map((s) => s.trim()).filter(Boolean),
+      bio: editForm.bio,
+    };
 
     await fetch(`/api/people/${params.id}`, {
       method: "PUT",
@@ -71,6 +103,29 @@ export default function PersonDetailPage() {
       body: JSON.stringify(body),
     });
     setEditing(false);
+    fetchPerson();
+  };
+
+  const addFact = async () => {
+    const fact = newFact.trim();
+    if (!fact) return;
+    const facts = [...(person?.facts || []), fact];
+    await fetch(`/api/people/${params.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ facts }),
+    });
+    setNewFact("");
+    fetchPerson();
+  };
+
+  const removeFact = async (fact: string) => {
+    const facts = (person?.facts || []).filter((f) => f !== fact);
+    await fetch(`/api/people/${params.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ facts }),
+    });
     fetchPerson();
   };
 
@@ -135,6 +190,25 @@ export default function PersonDetailPage() {
                     className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
                   />
                 </div>
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={editForm.isLiving}
+                    onChange={(e) => setEditForm({ ...editForm, isLiving: e.target.checked })}
+                    className="w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-primary-500/20"
+                  />
+                  Living
+                </label>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Facts (one per line)</label>
+                  <textarea
+                    value={editForm.facts}
+                    onChange={(e) => setEditForm({ ...editForm, facts: e.target.value })}
+                    placeholder={"Any fact about this person\nOne per line"}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500/20 resize-none"
+                    rows={3}
+                  />
+                </div>
                 <textarea
                   value={editForm.bio}
                   onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
@@ -155,7 +229,14 @@ export default function PersonDetailPage() {
               <>
                 <div className="flex justify-between items-start">
                   <div>
-                    <h1 className="text-3xl font-bold text-gray-900">{person.name}</h1>
+                    <div className="flex items-center gap-3">
+                      <h1 className="text-3xl font-bold text-gray-900">{person.name}</h1>
+                      {person.isLiving === false ? (
+                        <span className="text-xs font-medium text-gray-500 bg-gray-100 rounded-full px-2.5 py-1">Deceased</span>
+                      ) : (
+                        <span className="text-xs font-medium text-green-700 bg-green-50 rounded-full px-2.5 py-1">Living</span>
+                      )}
+                    </div>
                     <div className="flex gap-3 mt-2 text-sm text-gray-500">
                       {person.birthDate && (
                         <span>Born {new Date(person.birthDate).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</span>
@@ -295,6 +376,112 @@ export default function PersonDetailPage() {
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+          <div className="flex justify-between items-center px-6 py-5 border-b border-gray-50">
+            <h2 className="font-semibold text-gray-900">Lived At</h2>
+            <button
+              onClick={() => setShowLocForm(!showLocForm)}
+              className="text-sm font-medium text-gray-400 hover:text-gray-700 transition-colors"
+            >
+              {showLocForm ? "Cancel" : "Add"}
+            </button>
+          </div>
+
+          {showLocForm && (
+            <div className="px-6 py-5 bg-gray-50 border-b border-gray-100 space-y-3">
+              <input
+                type="text"
+                value={locName}
+                onChange={(e) => setLocName(e.target.value)}
+                placeholder="Where they lived (e.g. Lexington, KY)"
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+              />
+              <input
+                type="date"
+                value={locDate}
+                onChange={(e) => setLocDate(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+              />
+              <p className="text-xs text-gray-400">A date you know they were living there — not a move-in date.</p>
+              <button
+                onClick={addLocation}
+                className="w-full bg-gray-900 text-white py-2.5 rounded-xl text-sm font-medium hover:bg-gray-800 transition-all"
+              >
+                Add Location
+              </button>
+            </div>
+          )}
+
+          <div className="px-6 py-4">
+            {person.locations.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-sm text-gray-400">No locations yet</p>
+                <p className="text-xs text-gray-300 mt-1">Dates when you know they lived somewhere</p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {person.locations.map((l, i) => (
+                  <div key={i} className="flex justify-between items-center py-2.5 group">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">{l.location}</p>
+                      <p className="text-xs text-gray-400">
+                        {new Date(l.date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => removeLocation(l.location, l.date)}
+                      className="text-xs text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+          <div className="px-6 py-5 border-b border-gray-50">
+            <h2 className="font-semibold text-gray-900">Facts</h2>
+          </div>
+          <div className="px-6 py-4">
+            <div className="flex gap-2 mb-3">
+              <input
+                type="text"
+                value={newFact}
+                onChange={(e) => setNewFact(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addFact()}
+                placeholder="Add a fact..."
+                className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+              />
+              <button
+                onClick={addFact}
+                className="bg-gray-900 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-800 transition-all"
+              >
+                Add
+              </button>
+            </div>
+            {person.facts && person.facts.length > 0 ? (
+              <div className="space-y-1">
+                {person.facts.map((f, i) => (
+                  <div key={i} className="flex justify-between items-center py-2 group">
+                    <p className="text-sm text-gray-600">{f}</p>
+                    <button
+                      onClick={() => removeFact(f)}
+                      className="text-xs text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-300">No facts yet</p>
             )}
           </div>
         </div>

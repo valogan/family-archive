@@ -14,6 +14,8 @@ export default function PeoplePage() {
     name: "",
     birthDate: "",
     deathDate: "",
+    isLiving: true,
+    facts: "",
     bio: "",
   });
 
@@ -31,17 +33,22 @@ export default function PeoplePage() {
   }, []);
 
   const resetForm = () => {
-    setForm({ name: "", birthDate: "", deathDate: "", bio: "" });
+    setForm({ name: "", birthDate: "", deathDate: "", isLiving: true, facts: "", bio: "" });
     setEditing(null);
     setShowForm(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const body: any = { name: form.name };
-    if (form.birthDate) body.birthDate = form.birthDate;
-    if (form.deathDate) body.deathDate = form.deathDate;
-    if (form.bio) body.bio = form.bio;
+    const facts = form.facts.split("\n").map((s) => s.trim()).filter(Boolean);
+    const body: any = {
+      name: form.name,
+      birthDate: form.birthDate || null,
+      deathDate: form.deathDate || null,
+      isLiving: form.isLiving,
+      bio: form.bio,
+    };
+    if (facts.length > 0) body.facts = facts;
 
     if (editing) {
       await fetch(`/api/people/${editing.id}`, {
@@ -66,6 +73,8 @@ export default function PeoplePage() {
       name: p.name,
       birthDate: p.birthDate || "",
       deathDate: p.deathDate || "",
+      isLiving: p.isLiving !== false,
+      facts: (p.facts || []).join("\n"),
       bio: p.bio || "",
     });
     setShowForm(true);
@@ -179,6 +188,25 @@ export default function PeoplePage() {
                   onChange={(e) => setForm({ ...form, deathDate: e.target.value })}
                   className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-300 transition-all"
                 />
+                <label className="flex items-center gap-2 mt-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={form.isLiving}
+                    onChange={(e) => setForm({ ...form, isLiving: e.target.checked })}
+                    className="w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-primary-500/20"
+                  />
+                  Living
+                </label>
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Facts (one per line)</label>
+                <textarea
+                  value={form.facts}
+                  onChange={(e) => setForm({ ...form, facts: e.target.value })}
+                  placeholder={"Any fact about this person\nOne per line"}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-300 transition-all resize-none"
+                  rows={3}
+                />
               </div>
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Bio</label>
@@ -245,7 +273,12 @@ export default function PeoplePage() {
                   </div>
                   {p.birthDate && (
                     <span className="inline-block mt-1.5 text-xs font-medium text-gray-400 bg-gray-50 rounded-full px-2.5 py-0.5">
-                      {getAge(p.birthDate, p.deathDate)} years{p.deathDate ? " (deceased)" : " old"}
+                      {getAge(p.birthDate, p.deathDate)} years{p.isLiving === false || p.deathDate ? " (deceased)" : " old"}
+                    </span>
+                  )}
+                  {!p.birthDate && p.isLiving !== undefined && (
+                    <span className={`inline-block mt-1.5 text-xs font-medium rounded-full px-2.5 py-0.5 ${p.isLiving ? "text-green-700 bg-green-50" : "text-gray-500 bg-gray-100"}`}>
+                      {p.isLiving ? "Living" : "Deceased"}
                     </span>
                   )}
                   {p.bio && (

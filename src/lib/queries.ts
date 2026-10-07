@@ -1,5 +1,5 @@
 import { getDriver } from "./db";
-import { Person, Media, Relationship, PersonWithRelations, SearchResult } from "./types";
+import { Person, Media, Relationship, PersonWithRelations, SearchResult, LivedAt } from "./types";
 import { v4 as uuid } from "uuid";
 
 export async function createPerson(
@@ -13,7 +13,9 @@ export async function createPerson(
   const props: Record<string, any> = { id, name: data.name, createdAt };
   if (data.birthDate) props.birthDate = data.birthDate;
   if (data.deathDate) props.deathDate = data.deathDate;
+  if (data.isLiving !== undefined) props.isLiving = data.isLiving;
   if (data.bio) props.bio = data.bio;
+  if (data.facts) props.facts = data.facts;
 
   const keys = Object.keys(props);
   const setClause = keys.map((k) => `p.${k} = $${k}`).join(", ");
@@ -48,9 +50,11 @@ export async function getPerson(id: string): Promise<PersonWithRelations | null>
         "SPOUSE","GRANDMOTHER","GRANDFATHER","AUNT","UNCLE","COUSIN"
       ]
       OPTIONAL MATCH (p)-[:APPEARS_IN]->(m:Media)
+      OPTIONAL MATCH (p)-[l:LIVED_AT]->(loc:Location)
       RETURN p,
         collect(DISTINCT {person: related, type: type(r)}) as relationships,
-        collect(DISTINCT m) as media
+        collect(DISTINCT m) as media,
+        collect(DISTINCT {location: loc.name, date: l.date}) as locations
     `,
       { id }
     );
@@ -70,8 +74,12 @@ export async function getPerson(id: string): Promise<PersonWithRelations | null>
       .get("media")
       .filter((m: any) => m !== null)
       .map((m: any) => m.properties as Media);
+    const locations = record
+      .get("locations")
+      .filter((l: any) => l.location !== null)
+      .map((l: any) => ({ location: l.location, date: l.date }) as LivedAt);
 
-    return { ...person, relationships, media };
+    return { ...person, relationships, media, locations };
   } finally {
     await session.close();
   }
@@ -158,6 +166,11 @@ export async function searchPeople(query: string): Promise<Person[]> {
       MATCH (p:Person)
       WHERE toLower(p.name) CONTAINS toLower($query)
          OR toLower(p.bio) CONTAINS toLower($query)
+         OR ANY(f IN p.facts WHERE toLower(f) CONTAINS toLower($query))
+         OR EXISTS {
+              MATCH (p)-[:LIVED_AT]->(loc:Location)
+              WHERE toLower(loc.name) CONTAINS toLower($query)
+            }
       RETURN p
       ORDER BY p.name
     `,
@@ -212,6 +225,52 @@ export async function deleteRelationship(
       DELETE r
     `,
       { fromId, toId }
+    );
+    return true;
+  } finally {
+    await session.close();
+  }
+}
+
+export async function addLivedAt(
+  personId: string,
+  location: string,
+  date: string
+): Promise<boolean> {
+  const driver = getDriver();
+  const session = driver.session();
+
+  try {
+    const result = await session.run(
+      `
+      MATCH (p:Person {id: $personId})
+      MERGE (loc:Location {name: $location})
+      MERGE (p)-[r:LIVED_AT {date: $date}]->(loc)
+      RETURN p.id as id
+    `,
+      { personId, location, date }
+    );
+    return result.records.length > 0;
+  } finally {
+    await session.close();
+  }
+}
+
+export async function removeLivedAt(
+  personId: string,
+  location: string,
+  date: string
+): Promise<boolean> {
+  const driver = getDriver();
+  const session = driver.session();
+
+  try {
+    await session.run(
+      `
+      MATCH (p:Person {id: $personId})-[r:LIVED_AT {date: $date}]->(loc:Location {name: $location})
+      DELETE r
+    `,
+      { personId, location, date }
     );
     return true;
   } finally {

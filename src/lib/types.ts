@@ -3,8 +3,15 @@ export interface Person {
   name: string;
   birthDate?: string;
   deathDate?: string;
+  isLiving?: boolean;
   bio?: string;
+  facts?: string[];
   createdAt: string;
+}
+
+export interface LivedAt {
+  location: string;
+  date: string;
 }
 
 export interface Media {
@@ -41,6 +48,7 @@ export type RelationshipType =
 export interface PersonWithRelations extends Person {
   relationships: { person: Person; type: RelationshipType }[];
   media: Media[];
+  locations: LivedAt[];
 }
 
 export interface SearchResult {
