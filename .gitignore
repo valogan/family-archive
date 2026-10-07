@@ -33,4 +33,33 @@ yarn-error.log*
 next-env.d.ts
 
 # uploads
-/src/uploads
+/src/uploads# === sync policy: data and artifacts never reach the remote ===
+# (managed block — source: <wiki>/config/; a pre-commit hook additionally
+#  blocks any file over the size limit regardless of name)
+data/
+datasets/
+outputs/
+output/
+results/
+checkpoints/
+ckpts/
+runs/
+logs/
+*.env
+.env*
+!.env.example
+__pycache__/
+.venv/
+node_modules/
+.DS_Store
+Thumbs.db
+# --- Vaiden Logan's bulk artifact formats (ML + imaging + data) ---
+*.pt
+*.ckpt
+*.safetensors
+*.gguf
+*.parquet
+*.h5
+*.svs
+build/
+dist/
