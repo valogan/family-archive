@@ -54,7 +54,7 @@ export async function getPerson(id: string): Promise<PersonWithRelations | null>
       RETURN p,
         collect(DISTINCT {person: related, type: type(r)}) as relationships,
         collect(DISTINCT m) as media,
-        collect(DISTINCT {location: loc.name, date: l.date}) as locations
+        collect(DISTINCT {id: l.id, location: loc.name, date: l.date, moveIn: l.moveIn, moveOut: l.moveOut}) as locations
     `,
       { id }
     );
@@ -77,7 +77,7 @@ export async function getPerson(id: string): Promise<PersonWithRelations | null>
     const locations = record
       .get("locations")
       .filter((l: any) => l.location !== null)
-      .map((l: any) => ({ location: l.location, date: l.date }) as LivedAt);
+      .map((l: any) => l as LivedAt);
 
     return { ...person, relationships, media, locations };
   } finally {
@@ -235,20 +235,30 @@ export async function deleteRelationship(
 export async function addLivedAt(
   personId: string,
   location: string,
-  date: string
+  dates: { date?: string; moveIn?: string; moveOut?: string }
 ): Promise<boolean> {
   const driver = getDriver();
   const session = driver.session();
 
   try {
+    // Edge props are built dynamically: only the provided dates are stored
+    // (at least one is required, enforced by callers).
+    const props: Record<string, any> = { id: uuid() };
+    if (dates.date) props.date = dates.date;
+    if (dates.moveIn) props.moveIn = dates.moveIn;
+    if (dates.moveOut) props.moveOut = dates.moveOut;
+
+    const keys = Object.keys(props);
+    const propClause = keys.map((k) => `${k}: $${k}`).join(", ");
+
     const result = await session.run(
       `
       MATCH (p:Person {id: $personId})
       MERGE (loc:Location {name: $location})
-      MERGE (p)-[r:LIVED_AT {date: $date}]->(loc)
+      CREATE (p)-[:LIVED_AT {${propClause}}]->(loc)
       RETURN p.id as id
     `,
-      { personId, location, date }
+      { personId, location, ...props }
     );
     return result.records.length > 0;
   } finally {
@@ -258,21 +268,22 @@ export async function addLivedAt(
 
 export async function removeLivedAt(
   personId: string,
-  location: string,
-  date: string
+  livedAtId: string
 ): Promise<boolean> {
   const driver = getDriver();
   const session = driver.session();
 
   try {
-    await session.run(
+    const result = await session.run(
       `
-      MATCH (p:Person {id: $personId})-[r:LIVED_AT {date: $date}]->(loc:Location {name: $location})
+      MATCH (p:Person {id: $personId})-[r:LIVED_AT]->(loc:Location)
+      WHERE r.id = $livedAtId
       DELETE r
+      RETURN count(r) as deleted
     `,
-      { personId, location, date }
+      { personId, livedAtId }
     );
-    return true;
+    return result.records[0].get("deleted").toNumber() > 0;
   } finally {
     await session.close();
   }

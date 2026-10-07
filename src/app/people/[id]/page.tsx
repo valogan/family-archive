@@ -22,6 +22,8 @@ export default function PersonDetailPage() {
   const [showLocForm, setShowLocForm] = useState(false);
   const [locName, setLocName] = useState("");
   const [locDate, setLocDate] = useState("");
+  const [locMoveIn, setLocMoveIn] = useState("");
+  const [locMoveOut, setLocMoveOut] = useState("");
   const [newFact, setNewFact] = useState("");
 
   const fetchPerson = async () => {
@@ -66,23 +68,30 @@ export default function PersonDetailPage() {
   };
 
   const addLocation = async () => {
-    if (!locName || !locDate) return;
+    if (!locName || (!locDate && !locMoveIn && !locMoveOut)) return;
     await fetch(`/api/people/${params.id}/locations`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ location: locName, date: locDate }),
+      body: JSON.stringify({
+        location: locName,
+        date: locDate || undefined,
+        moveIn: locMoveIn || undefined,
+        moveOut: locMoveOut || undefined,
+      }),
     });
     setShowLocForm(false);
     setLocName("");
     setLocDate("");
+    setLocMoveIn("");
+    setLocMoveOut("");
     fetchPerson();
   };
 
-  const removeLocation = async (location: string, date: string) => {
+  const removeLocation = async (livedAtId: string) => {
     await fetch(`/api/people/${params.id}/locations`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ location, date }),
+      body: JSON.stringify({ livedAtId }),
     });
     fetchPerson();
   };
@@ -400,13 +409,36 @@ export default function PersonDetailPage() {
                 placeholder="Where they lived (e.g. Lexington, KY)"
                 className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20"
               />
-              <input
-                type="date"
-                value={locDate}
-                onChange={(e) => setLocDate(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20"
-              />
-              <p className="text-xs text-gray-400">A date you know they were living there — not a move-in date.</p>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">There on</label>
+                  <input
+                    type="date"
+                    value={locDate}
+                    onChange={(e) => setLocDate(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Moved in</label>
+                  <input
+                    type="date"
+                    value={locMoveIn}
+                    onChange={(e) => setLocMoveIn(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Moved out</label>
+                  <input
+                    type="date"
+                    value={locMoveOut}
+                    onChange={(e) => setLocMoveOut(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-gray-400">Fill any of the three — at least one. &quot;There on&quot; is a date you know they were living there, not a move-in date.</p>
               <button
                 onClick={addLocation}
                 className="w-full bg-gray-900 text-white py-2.5 rounded-xl text-sm font-medium hover:bg-gray-800 transition-all"
@@ -424,16 +456,20 @@ export default function PersonDetailPage() {
               </div>
             ) : (
               <div className="space-y-1">
-                {person.locations.map((l, i) => (
-                  <div key={i} className="flex justify-between items-center py-2.5 group">
+                {person.locations.map((l) => (
+                  <div key={l.id} className="flex justify-between items-center py-2.5 group">
                     <div>
                       <p className="text-sm font-medium text-gray-700">{l.location}</p>
                       <p className="text-xs text-gray-400">
-                        {new Date(l.date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+                        {[
+                          l.date && `there ${new Date(l.date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`,
+                          l.moveIn && `moved in ${new Date(l.moveIn).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`,
+                          l.moveOut && `moved out ${new Date(l.moveOut).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`,
+                        ].filter(Boolean).join(" · ")}
                       </p>
                     </div>
                     <button
-                      onClick={() => removeLocation(l.location, l.date)}
+                      onClick={() => removeLocation(l.id)}
                       className="text-xs text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
                     >
                       Remove

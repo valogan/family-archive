@@ -10,8 +10,11 @@ export interface Person {
 }
 
 export interface LivedAt {
+  id: string;
   location: string;
-  date: string;
+  date?: string;
+  moveIn?: string;
+  moveOut?: string;
 }
 
 export interface Media {
