@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createMedia, getAllMedia, searchMedia, linkPersonToMedia } from "@/lib/queries";
+import { queuePersonSummary } from "@/lib/llm";
 import { writeFile, mkdir } from "fs/promises";
 import { v4 as uuid } from "uuid";
 import path from "path";
@@ -38,6 +39,9 @@ export async function POST(req: NextRequest) {
 
     for (const personId of personIds) {
       await linkPersonToMedia(personId, media.id);
+    }
+    for (const personId of personIds) {
+      queuePersonSummary(personId);
     }
 
     return NextResponse.json(media, { status: 201 });

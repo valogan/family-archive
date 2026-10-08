@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { LLMConfig, SearchResult, PersonWithRelations } from "./types";
-import { fullSearch, advancedSearch } from "./queries";
+import { fullSearch, advancedSearch, getPerson, setPersonSummary } from "./queries";
 
 const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
@@ -168,4 +168,40 @@ export async function generatePersonSummary(
   });
 
   return resp.choices[0].message.content || "";
+}
+
+// Summaries are regenerated in the background after any change to a
+// person's data (edits, relationships, locations, media associations).
+// Runs are serialized per person so rapid edits can't race; each run
+// re-reads the person, so the last stored summary reflects the latest
+// data.
+const summaryQueues = new Map<string, Promise<void>>();
+
+async function regeneratePersonSummary(personId: string): Promise<string> {
+  const person = await getPerson(personId);
+  if (!person) throw new Error("Person not found");
+  const summary = await generatePersonSummary(person);
+  await setPersonSummary(personId, summary);
+  return summary;
+}
+
+export function queuePersonSummary(personId: string): void {
+  const prev = summaryQueues.get(personId) ?? Promise.resolve();
+  const next = prev
+    .catch(() => {})
+    .then(() => regeneratePersonSummary(personId))
+    .then(() => undefined)
+    .catch((err) =>
+      console.error(`Background summary generation failed for ${personId}:`, err)
+    );
+  summaryQueues.set(personId, next);
+  next.finally(() => {
+    if (summaryQueues.get(personId) === next) summaryQueues.delete(personId);
+  });
+}
+
+export async function forcePersonSummary(personId: string): Promise<string> {
+  const prev = summaryQueues.get(personId) ?? Promise.resolve();
+  await prev.catch(() => {});
+  return regeneratePersonSummary(personId);
 }

@@ -5,6 +5,7 @@ import {
   deletePerson,
   getRelationships,
 } from "@/lib/queries";
+import { queuePersonSummary } from "@/lib/llm";
 
 export async function GET(
   _req: NextRequest,
@@ -29,6 +30,7 @@ export async function PUT(
     const body = await req.json();
     const person = await updatePerson(id, body);
     if (!person) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    queuePersonSummary(id);
     return NextResponse.json(person);
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

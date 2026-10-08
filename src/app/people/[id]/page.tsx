@@ -25,7 +25,6 @@ export default function PersonDetailPage() {
   const [locMoveIn, setLocMoveIn] = useState("");
   const [locMoveOut, setLocMoveOut] = useState("");
   const [newFact, setNewFact] = useState("");
-  const [summary, setSummary] = useState<string | null>(null);
   const [summarizing, setSummarizing] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
 
@@ -148,7 +147,7 @@ export default function PersonDetailPage() {
       const res = await fetch(`/api/people/${params.id}/summary`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to generate summary");
-      setSummary(data.summary);
+      await fetchPerson();
     } catch (e: any) {
       setSummaryError(e.message);
     } finally {
@@ -299,7 +298,7 @@ export default function PersonDetailPage() {
             disabled={summarizing}
             className="text-sm font-medium text-gray-400 hover:text-gray-700 transition-colors disabled:opacity-50"
           >
-            {summarizing ? "Generating..." : summary ? "Regenerate" : "Generate"}
+            {summarizing ? "Generating..." : person.summary ? "Regenerate" : "Generate"}
           </button>
         </div>
         {summarizing ? (
@@ -312,11 +311,11 @@ export default function PersonDetailPage() {
           </div>
         ) : summaryError ? (
           <p className="text-sm text-red-500">{summaryError}</p>
-        ) : summary ? (
-          <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{summary}</p>
+        ) : person.summary ? (
+          <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{person.summary}</p>
         ) : (
           <p className="text-sm text-gray-400">
-            Generate a biographical summary from everything the archive knows about this person — their facts, relationships, places they lived, and photos.
+            Generated automatically from everything the archive knows about this person — their facts, relationships, places they lived, and photos. It updates whenever their information changes.
           </p>
         )}
       </div>

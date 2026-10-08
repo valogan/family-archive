@@ -6,6 +6,7 @@ export interface Person {
   isLiving?: boolean;
   bio?: string;
   facts?: string[];
+  summary?: string;
   createdAt: string;
 }
 

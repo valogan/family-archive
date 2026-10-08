@@ -4,11 +4,13 @@ import {
   getAllPeople,
   searchPeople,
 } from "@/lib/queries";
+import { queuePersonSummary } from "@/lib/llm";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const person = await createPerson(body);
+    queuePersonSummary(person.id);
     return NextResponse.json(person, { status: 201 });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

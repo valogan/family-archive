@@ -137,6 +137,26 @@ export async function updatePerson(
   }
 }
 
+export async function setPersonSummary(
+  id: string,
+  summary: string
+): Promise<void> {
+  const driver = getDriver();
+  const session = driver.session();
+
+  try {
+    await session.run(
+      `
+      MATCH (p:Person {id: $id})
+      SET p.summary = $summary
+    `,
+      { id, summary }
+    );
+  } finally {
+    await session.close();
+  }
+}
+
 export async function deletePerson(id: string): Promise<boolean> {
   const driver = getDriver();
   const session = driver.session();

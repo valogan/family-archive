@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { tagPersonInMedia, untagPersonInMedia } from "@/lib/queries";
+import { queuePersonSummary } from "@/lib/llm";
 
 const isFraction = (v: any) => typeof v === "number" && v >= 0 && v <= 1;
 
@@ -18,6 +19,7 @@ export async function PUT(
     }
     const ok = await tagPersonInMedia(personId, id, { x, y, w, h });
     if (!ok) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    queuePersonSummary(personId);
     return NextResponse.json({ success: true });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

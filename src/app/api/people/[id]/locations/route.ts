@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addLivedAt, removeLivedAt } from "@/lib/queries";
+import { queuePersonSummary } from "@/lib/llm";
 
 export async function POST(
   req: NextRequest,
@@ -19,6 +20,7 @@ export async function POST(
     }
     const ok = await addLivedAt(id, location, { date, moveIn, moveOut });
     if (!ok) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    queuePersonSummary(id);
     return NextResponse.json({ success: true }, { status: 201 });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -37,6 +39,7 @@ export async function DELETE(
     }
     const ok = await removeLivedAt(id, livedAtId);
     if (!ok) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    queuePersonSummary(id);
     return NextResponse.json({ success: true });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
