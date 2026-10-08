@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { LLMConfig, SearchResult } from "./types";
+import { LLMConfig, SearchResult, PersonWithRelations } from "./types";
 import { fullSearch, advancedSearch } from "./queries";
 
 const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
@@ -118,4 +118,54 @@ export async function conversationalSearch(
     reply: msg.content || "I couldn't find anything matching your request.",
     results,
   };
+}
+
+export async function generatePersonSummary(
+  person: PersonWithRelations
+): Promise<string> {
+  const config = getLLMConfig();
+  const client = new OpenAI({
+    baseURL: config.baseUrl,
+    apiKey: config.apiKey,
+  });
+
+  const data = {
+    name: person.name,
+    isLiving: person.isLiving,
+    birthDate: person.birthDate,
+    deathDate: person.deathDate,
+    bio: person.bio,
+    facts: person.facts || [],
+    relationships: person.relationships.map(
+      (r) => `${r.type.toLowerCase()}: ${r.person.name}`
+    ),
+    locationsLived: person.locations.map((l) => ({
+      location: l.location,
+      thereOn: l.date,
+      movedIn: l.moveIn,
+      movedOut: l.moveOut,
+    })),
+    media: person.media.map((m) => ({
+      name: m.originalName,
+      location: m.location,
+      date: m.dateTaken,
+    })),
+  };
+
+  const resp = await client.chat.completions.create({
+    model: config.model,
+    messages: [
+      {
+        role: "system",
+        content:
+          "You are a family archive assistant. Write a short biographical summary (one or two paragraphs) of this person using ONLY the information provided in the archive data. Do not invent facts. Write in plain prose with no markdown formatting. If little is known, keep the summary brief and note that the archive has limited information about them.",
+      },
+      {
+        role: "user",
+        content: `Write a summary of this family member based on this archive data:\n\n${JSON.stringify(data, null, 2)}`,
+      },
+    ],
+  });
+
+  return resp.choices[0].message.content || "";
 }

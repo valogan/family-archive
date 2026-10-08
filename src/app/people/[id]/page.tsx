@@ -25,6 +25,9 @@ export default function PersonDetailPage() {
   const [locMoveIn, setLocMoveIn] = useState("");
   const [locMoveOut, setLocMoveOut] = useState("");
   const [newFact, setNewFact] = useState("");
+  const [summary, setSummary] = useState<string | null>(null);
+  const [summarizing, setSummarizing] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
 
   const fetchPerson = async () => {
     const res = await fetch(`/api/people/${params.id}`);
@@ -136,6 +139,21 @@ export default function PersonDetailPage() {
       body: JSON.stringify({ facts }),
     });
     fetchPerson();
+  };
+
+  const generateSummary = async () => {
+    setSummarizing(true);
+    setSummaryError(null);
+    try {
+      const res = await fetch(`/api/people/${params.id}/summary`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to generate summary");
+      setSummary(data.summary);
+    } catch (e: any) {
+      setSummaryError(e.message);
+    } finally {
+      setSummarizing(false);
+    }
   };
 
   if (!person) {
@@ -271,6 +289,36 @@ export default function PersonDetailPage() {
             )}
           </div>
         </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="font-semibold text-gray-900">AI Summary</h2>
+          <button
+            onClick={generateSummary}
+            disabled={summarizing}
+            className="text-sm font-medium text-gray-400 hover:text-gray-700 transition-colors disabled:opacity-50"
+          >
+            {summarizing ? "Generating..." : summary ? "Regenerate" : "Generate"}
+          </button>
+        </div>
+        {summarizing ? (
+          <div className="flex items-center gap-2 text-sm text-gray-400">
+            <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            Writing a summary from the archive...
+          </div>
+        ) : summaryError ? (
+          <p className="text-sm text-red-500">{summaryError}</p>
+        ) : summary ? (
+          <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{summary}</p>
+        ) : (
+          <p className="text-sm text-gray-400">
+            Generate a biographical summary from everything the archive knows about this person — their facts, relationships, places they lived, and photos.
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
