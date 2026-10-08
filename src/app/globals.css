@@ -1,3 +1,77 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Dark mode. Applied via a `dark` class on <html> (toggled from the nav,
+ * persisted in localStorage, defaults to the system preference). The
+ * overrides below remap the neutral palette the app uses; photos and
+ * elements sitting on top of photos (tag boxes, name chips) are left
+ * untouched on purpose.
+ */
+
+html.dark {
+  color-scheme: dark;
+}
+
+.dark body {
+  background-color: #0b0f17;
+  color: #e5e7eb;
+}
+
+/* Surfaces */
+.dark .bg-white { background-color: #151b26; }
+.dark .bg-white\/80 { background-color: rgba(21, 27, 38, 0.8); }
+.dark .bg-gray-50 { background-color: #0b0f17; }
+.dark .bg-gray-100 { background-color: #232b3a; }
+.dark .hover\:bg-gray-50:hover { background-color: #1a2230; }
+.dark .hover\:bg-gray-100:hover { background-color: #232b3a; }
+.dark .focus\:bg-white:focus { background-color: #1d2432; }
+
+/* Dark buttons invert to light */
+.dark .bg-gray-900 { background-color: #e5e7eb; }
+.dark .bg-gray-900.text-white { color: #111827; }
+.dark .hover\:bg-gray-800:hover { background-color: #d1d5db; }
+
+/* Text */
+.dark .text-gray-900 { color: #f3f4f6; }
+.dark .text-gray-700 { color: #d1d5db; }
+.dark .text-gray-600 { color: #b7bfcc; }
+.dark .text-gray-500 { color: #9aa4b2; }
+.dark .text-gray-400 { color: #6b7686; }
+.dark .text-gray-300 { color: #4b5563; }
+.dark .hover\:text-gray-700:hover { color: #d1d5db; }
+.dark input::placeholder,
+.dark textarea::placeholder { color: #6b7686; }
+
+/* Borders */
+.dark .border-gray-50 { border-color: #1a212c; }
+.dark .border-gray-100 { border-color: #1f2733; }
+.dark .border-gray-200 { border-color: #2a3444; }
+.dark .border-gray-300 { border-color: #374151; }
+.dark .hover\:border-gray-300:hover { border-color: #374151; }
+
+/* Primary / accent tints go translucent on dark */
+.dark .bg-primary-50 { background-color: rgba(59, 130, 246, 0.15); }
+.dark .bg-primary-100 { background-color: rgba(59, 130, 246, 0.25); }
+.dark .bg-primary-500\/20 { background-color: rgba(59, 130, 246, 0.25); }
+.dark .text-primary-600 { color: #60a5fa; }
+.dark .text-primary-700 { color: #93c5fd; }
+.dark .border-primary-200 { border-color: rgba(59, 130, 246, 0.35); }
+.dark .border-primary-300 { border-color: rgba(59, 130, 246, 0.45); }
+.dark .bg-accent-50 { background-color: rgba(168, 85, 247, 0.15); }
+.dark .bg-accent-100 { background-color: rgba(168, 85, 247, 0.25); }
+.dark .text-accent-600 { color: #c084fc; }
+
+/* Status + avatar chip colors */
+.dark .bg-green-50 { background-color: rgba(52, 211, 153, 0.12); }
+.dark .bg-green-100 { background-color: rgba(52, 211, 153, 0.18); }
+.dark .text-green-700 { color: #6ee7b7; }
+.dark .bg-blue-100 { background-color: rgba(59, 130, 246, 0.18); }
+.dark .text-blue-700 { color: #93c5fd; }
+.dark .bg-purple-100 { background-color: rgba(168, 85, 247, 0.18); }
+.dark .text-purple-700 { color: #d8b4fe; }
+.dark .bg-amber-100 { background-color: rgba(245, 158, 11, 0.2); }
+.dark .text-amber-700 { color: #fcd34d; }
+.dark .bg-rose-100 { background-color: rgba(244, 63, 94, 0.18); }
+.dark .text-rose-700 { color: #fda4af; }
