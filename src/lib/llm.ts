@@ -1,6 +1,13 @@
 import OpenAI from "openai";
 import { LLMConfig, SearchResult, PersonWithRelations } from "./types";
-import { fullSearch, advancedSearch, getPerson, setPersonSummary } from "./queries";
+import {
+  fullSearch,
+  advancedSearch,
+  getPerson,
+  setPersonSummary,
+  findPersonByName,
+  getLocationInfo,
+} from "./queries";
 
 const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
@@ -41,6 +48,45 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "get_person_details",
+      description:
+        "Get the full record for one specific person: birth/death dates, living status, bio, facts, family relationships, everywhere they lived with dates, their stored summary, and the photos/videos they appear in. Use after searching to answer questions about a particular person.",
+      parameters: {
+        type: "object",
+        properties: {
+          personId: {
+            type: "string",
+            description: "The person's id (from search results)",
+          },
+          name: {
+            type: "string",
+            description: "The person's exact full name, if you don't know their id",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_location_details",
+      description:
+        "Get everything the archive knows about a place: every person who lived there (with the dates they lived there) and all photos/videos tagged with that location.",
+      parameters: {
+        type: "object",
+        properties: {
+          location: {
+            type: "string",
+            description: "Place name or fragment, e.g. 'Chicago' or 'Lexington, KY'",
+          },
+        },
+        required: ["location"],
+      },
+    },
+  },
 ];
 
 function getLLMConfig(): LLMConfig {
@@ -64,7 +110,7 @@ export async function conversationalSearch(
     {
       role: "system",
       content:
-        "You are a helpful family archive assistant. You help users search through their family photos, videos, and family members. Use the available functions to answer questions about the family. Respond conversationally and summarize findings. Always use the search tools to find information - never make up data.",
+        "You are a helpful family archive assistant. You help users search through their family photos, videos, and family members. Use the available functions to answer questions about the family. search_family_archive and advanced_family_search find people and media; get_person_details pulls one person's full record (facts, relationships, places they lived, summary, media); get_location_details shows who lived somewhere and what media was taken there. In residence records, 'date' means a day the person is known to have been living there - a point-in-time attestation, NOT a move-in or move-out date; only 'moveIn' and 'moveOut' indicate an actual move. Respond conversationally and summarize findings. Always use the search tools to find information - never make up data.",
     },
     { role: "user", content: userMessage },
   ];
@@ -97,6 +143,28 @@ export async function conversationalSearch(
       } else if (tc.function.name === "advanced_family_search") {
         const result = await advancedSearch(args as any);
         results.push(result);
+        messages.push({
+          role: "tool",
+          tool_call_id: tc.id,
+          content: JSON.stringify(result),
+        });
+      } else if (tc.function.name === "get_person_details") {
+        let details = null;
+        if (args.personId) {
+          details = await getPerson(args.personId as string);
+        } else if (args.name) {
+          const found = await findPersonByName(args.name as string);
+          if (found) details = await getPerson(found.id);
+        }
+        messages.push({
+          role: "tool",
+          tool_call_id: tc.id,
+          content: details
+            ? JSON.stringify(details)
+            : JSON.stringify({ error: "No person found with that id or name" }),
+        });
+      } else if (tc.function.name === "get_location_details") {
+        const result = await getLocationInfo(args.location as string);
         messages.push({
           role: "tool",
           tool_call_id: tc.id,

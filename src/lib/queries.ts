@@ -85,6 +85,71 @@ export async function getPerson(id: string): Promise<PersonWithRelations | null>
   }
 }
 
+export async function findPersonByName(name: string): Promise<Person | null> {
+  const driver = getDriver();
+  const session = driver.session();
+
+  try {
+    const result = await session.run(
+      `
+      MATCH (p:Person)
+      WHERE toLower(p.name) = toLower($name)
+      RETURN p
+      ORDER BY p.name
+      LIMIT 1
+    `,
+      { name }
+    );
+    if (result.records.length === 0) return null;
+    return result.records[0].get("p").properties as Person;
+  } finally {
+    await session.close();
+  }
+}
+
+export async function getLocationInfo(
+  location: string
+): Promise<{
+  people: { person: Person; date?: string; moveIn?: string; moveOut?: string }[];
+  media: Media[];
+}> {
+  const driver = getDriver();
+  const session = driver.session();
+
+  try {
+    const livedResult = await session.run(
+      `
+      MATCH (p:Person)-[l:LIVED_AT]->(loc:Location)
+      WHERE toLower(loc.name) CONTAINS toLower($location)
+      RETURN p, l.date as date, l.moveIn as moveIn, l.moveOut as moveOut
+      ORDER BY p.name
+    `,
+      { location }
+    );
+    const mediaResult = await session.run(
+      `
+      MATCH (m:Media)
+      WHERE m.location IS NOT NULL AND toLower(m.location) CONTAINS toLower($location)
+      RETURN m
+      ORDER BY m.dateTaken DESC
+    `,
+      { location }
+    );
+
+    return {
+      people: livedResult.records.map((r) => ({
+        person: r.get("p").properties as Person,
+        date: r.get("date") || undefined,
+        moveIn: r.get("moveIn") || undefined,
+        moveOut: r.get("moveOut") || undefined,
+      })),
+      media: mediaResult.records.map((r) => r.get("m").properties as Media),
+    };
+  } finally {
+    await session.close();
+  }
+}
+
 export async function getAllPeople(): Promise<Person[]> {
   const driver = getDriver();
   const session = driver.session();
