@@ -76,7 +76,7 @@ export default function SearchPage() {
     <div>
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Search</h1>
-        <p className="text-gray-500 text-sm mt-1">Filter by name, location, or date — or ask AI</p>
+        <p className="text-gray-500 text-sm mt-1">Filter by name, location, or date — or conversationally search</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
@@ -149,7 +149,7 @@ export default function SearchPage() {
             </div>
             <div>
               <h2 className="font-semibold text-gray-900">Conversational Search</h2>
-              <p className="text-xs text-gray-400">Ask naturally — AI queries the graph</p>
+              <p className="text-xs text-gray-400">Ask naturally — the graph is queried using natural language</p>
             </div>
           </div>
           <div className="flex gap-3">

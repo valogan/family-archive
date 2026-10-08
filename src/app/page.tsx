@@ -81,7 +81,7 @@ export default function Home() {
           </div>
           <div>
             <h2 className="font-semibold text-gray-900">Ask the Archive</h2>
-            <p className="text-xs text-gray-400">AI-powered conversational search</p>
+            <p className="text-xs text-gray-400">conversational search</p>
           </div>
         </div>
         <div className="flex gap-3">
