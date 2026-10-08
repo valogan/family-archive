@@ -6,6 +6,11 @@ import { usePathname } from "next/navigation";
 export function Nav() {
   const pathname = usePathname();
 
+  const logout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/login";
+  };
+
   const links = [
     { href: "/", label: "Home" },
     { href: "/people", label: "People" },
@@ -41,6 +46,12 @@ export function Nav() {
               </Link>
             );
           })}
+          <button
+            onClick={logout}
+            className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-all"
+          >
+            Log out
+          </button>
         </nav>
       </div>
     </header>
