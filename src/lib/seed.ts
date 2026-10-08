@@ -23,6 +23,9 @@ export async function initSchema(): Promise<void> {
     await session.run(`
       CREATE INDEX location_name IF NOT EXISTS FOR (l:Location) ON (l.name)
     `);
+    await session.run(`
+      CREATE INDEX life_event_id IF NOT EXISTS FOR (ev:LifeEvent) ON (ev.id)
+    `);
     console.log("Neo4j schema initialized");
   } finally {
     await session.close();
@@ -79,6 +82,10 @@ export async function seedDemo(): Promise<void> {
         (p5)-[:LIVED_AT {id: "lv9", date: "1990-08-25"}]->(lex),
         (p6)-[:LIVED_AT {id: "lv10", date: "1993-01-12"}]->(lex),
         (p3)-[:LIVED_AT {id: "lv11", moveIn: "1995-09-01", moveOut: "2020-05-15"}]->(lex),
+
+        (p1)-[:HAS_EVENT]->(ev1:LifeEvent {id: "ev1", label: "Joined the Navy", date: "1958"}),
+        (p2)-[:HAS_EVENT]->(ev2:LifeEvent {id: "ev2", label: "Retired from teaching", date: "2007"}),
+        (p6)-[:HAS_EVENT]->(ev3:LifeEvent {id: "ev3", label: "Earned Eagle Scout rank", date: "10/7/2009"}),
 
         (p1)-[:APPEARS_IN]->(m1),
         (p2)-[:APPEARS_IN]->(m1),

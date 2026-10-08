@@ -213,6 +213,10 @@ export async function generatePersonSummary(
       movedIn: l.moveIn,
       movedOut: l.moveOut,
     })),
+    lifeEvents: person.events.map((e) => ({
+      event: e.label,
+      date: e.date,
+    })),
     media: person.media.map((m) => ({
       name: m.originalName,
       location: m.location,

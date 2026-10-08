@@ -1,5 +1,5 @@
 import { getDriver } from "./db";
-import { Person, Media, Relationship, PersonWithRelations, SearchResult, LivedAt, MediaWithTags, MediaTag } from "./types";
+import { Person, Media, Relationship, PersonWithRelations, SearchResult, LivedAt, LifeEvent, MediaWithTags, MediaTag } from "./types";
 import { v4 as uuid } from "uuid";
 
 export async function createPerson(
@@ -51,10 +51,12 @@ export async function getPerson(id: string): Promise<PersonWithRelations | null>
       ]
       OPTIONAL MATCH (p)-[:APPEARS_IN]->(m:Media)
       OPTIONAL MATCH (p)-[l:LIVED_AT]->(loc:Location)
+      OPTIONAL MATCH (p)-[:HAS_EVENT]->(ev:LifeEvent)
       RETURN p,
         collect(DISTINCT {person: related, type: type(r)}) as relationships,
         collect(DISTINCT m) as media,
-        collect(DISTINCT {id: l.id, location: loc.name, date: l.date, moveIn: l.moveIn, moveOut: l.moveOut}) as locations
+        collect(DISTINCT {id: l.id, location: loc.name, date: l.date, moveIn: l.moveIn, moveOut: l.moveOut}) as locations,
+        collect(DISTINCT {id: ev.id, label: ev.label, date: ev.date}) as events
     `,
       { id }
     );
@@ -78,8 +80,12 @@ export async function getPerson(id: string): Promise<PersonWithRelations | null>
       .get("locations")
       .filter((l: any) => l.location !== null)
       .map((l: any) => l as LivedAt);
+    const events = record
+      .get("events")
+      .filter((e: any) => e.label !== null)
+      .map((e: any) => e as LifeEvent);
 
-    return { ...person, relationships, media, locations };
+    return { ...person, relationships, media, locations, events };
   } finally {
     await session.close();
   }
@@ -256,6 +262,10 @@ export async function searchPeople(query: string): Promise<Person[]> {
               MATCH (p)-[:LIVED_AT]->(loc:Location)
               WHERE toLower(loc.name) CONTAINS toLower($query)
             }
+         OR EXISTS {
+              MATCH (p)-[:HAS_EVENT]->(ev:LifeEvent)
+              WHERE toLower(ev.label) CONTAINS toLower($query)
+            }
       RETURN p
       ORDER BY p.name
     `,
@@ -367,6 +377,56 @@ export async function removeLivedAt(
       RETURN count(r) as deleted
     `,
       { personId, livedAtId }
+    );
+    return result.records[0].get("deleted").toNumber() > 0;
+  } finally {
+    await session.close();
+  }
+}
+
+export async function addLifeEvent(
+  personId: string,
+  label: string,
+  date?: string
+): Promise<LifeEvent | null> {
+  const driver = getDriver();
+  const session = driver.session();
+  const id = uuid();
+
+  try {
+    // Date is stored as entered - it may be a full date ("10/7/2005")
+    // or just a year ("2005"), so it stays a plain string.
+    const result = await session.run(
+      `
+      MATCH (p:Person {id: $personId})
+      CREATE (p)-[:HAS_EVENT]->(ev:LifeEvent {id: $id, label: $label})
+      SET ev.date = $date
+      RETURN ev
+    `,
+      { personId, id, label, date: date || null }
+    );
+    if (result.records.length === 0) return null;
+    return result.records[0].get("ev").properties as LifeEvent;
+  } finally {
+    await session.close();
+  }
+}
+
+export async function removeLifeEvent(
+  personId: string,
+  eventId: string
+): Promise<boolean> {
+  const driver = getDriver();
+  const session = driver.session();
+
+  try {
+    const result = await session.run(
+      `
+      MATCH (p:Person {id: $personId})-[:HAS_EVENT]->(ev:LifeEvent {id: $eventId})
+      DETACH DELETE ev
+      RETURN count(ev) as deleted
+    `,
+      { personId, eventId }
     );
     return result.records[0].get("deleted").toNumber() > 0;
   } finally {

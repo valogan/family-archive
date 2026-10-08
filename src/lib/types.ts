@@ -18,6 +18,12 @@ export interface LivedAt {
   moveOut?: string;
 }
 
+export interface LifeEvent {
+  id: string;
+  label: string;
+  date?: string;
+}
+
 export interface MediaTag {
   x: number;
   y: number;
@@ -64,6 +70,7 @@ export interface PersonWithRelations extends Person {
   relationships: { person: Person; type: RelationshipType }[];
   media: Media[];
   locations: LivedAt[];
+  events: LifeEvent[];
 }
 
 export interface SearchResult {

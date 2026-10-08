@@ -24,6 +24,9 @@ export default function PersonDetailPage() {
   const [locDate, setLocDate] = useState("");
   const [locMoveIn, setLocMoveIn] = useState("");
   const [locMoveOut, setLocMoveOut] = useState("");
+  const [showEventForm, setShowEventForm] = useState(false);
+  const [eventLabel, setEventLabel] = useState("");
+  const [eventDate, setEventDate] = useState("");
   const [newFact, setNewFact] = useState("");
   const [summarizing, setSummarizing] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
@@ -94,6 +97,28 @@ export default function PersonDetailPage() {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ livedAtId }),
+    });
+    fetchPerson();
+  };
+
+  const addEvent = async () => {
+    if (!eventLabel.trim()) return;
+    await fetch(`/api/people/${params.id}/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ label: eventLabel.trim(), date: eventDate || undefined }),
+    });
+    setShowEventForm(false);
+    setEventLabel("");
+    setEventDate("");
+    fetchPerson();
+  };
+
+  const removeEvent = async (eventId: string) => {
+    await fetch(`/api/people/${params.id}/events`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventId }),
     });
     fetchPerson();
   };
@@ -517,6 +542,69 @@ export default function PersonDetailPage() {
                     </div>
                     <button
                       onClick={() => removeLocation(l.id)}
+                      className="text-xs text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+          <div className="flex justify-between items-center px-6 py-5 border-b border-gray-50">
+            <h2 className="font-semibold text-gray-900">Life Events</h2>
+            <button
+              onClick={() => setShowEventForm(!showEventForm)}
+              className="text-sm font-medium text-gray-400 hover:text-gray-700 transition-colors"
+            >
+              {showEventForm ? "Cancel" : "Add"}
+            </button>
+          </div>
+
+          {showEventForm && (
+            <div className="px-6 py-5 bg-gray-50 border-b border-gray-100 space-y-3">
+              <input
+                type="text"
+                value={eventLabel}
+                onChange={(e) => setEventLabel(e.target.value)}
+                placeholder="Event (e.g. Joined the Navy)"
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+              />
+              <input
+                type="text"
+                value={eventDate}
+                onChange={(e) => setEventDate(e.target.value)}
+                placeholder="When (e.g. 2005 or 10/7/2005 — optional)"
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+              />
+              <button
+                onClick={addEvent}
+                className="w-full bg-gray-900 text-white py-2.5 rounded-xl text-sm font-medium hover:bg-gray-800 transition-all"
+              >
+                Add Event
+              </button>
+            </div>
+          )}
+
+          <div className="px-6 py-4">
+            {person.events.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-sm text-gray-400">No life events yet</p>
+                <p className="text-xs text-gray-300 mt-1">Milestones like joining the Navy or retiring</p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {person.events.map((e) => (
+                  <div key={e.id} className="flex justify-between items-center py-2.5 group">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">{e.label}</p>
+                      {e.date && <p className="text-xs text-gray-400">{e.date}</p>}
+                    </div>
+                    <button
+                      onClick={() => removeEvent(e.id)}
                       className="text-xs text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
                     >
                       Remove
