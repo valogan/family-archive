@@ -69,7 +69,7 @@ export default function Home() {
           </div>
           <h2 className="text-lg font-semibold mb-2 text-gray-900">Search</h2>
           <p className="text-sm text-gray-500 leading-relaxed">
-            Filter by name, location, or date. Ask natural language questions with AI-powered search.
+            Filter by name, location, or date. Ask natural language questions with conversational search.
           </p>
         </Link>
       </div>
